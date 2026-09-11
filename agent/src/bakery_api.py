@@ -3,7 +3,7 @@ from typing import Any
 
 import httpx
 
-DEFAULT_URL = "http://localhost:3000"
+DEFAULT_URL = "http://localhost:3099"
 
 
 def spell(code: str) -> str:
