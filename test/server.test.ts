@@ -27,7 +27,7 @@ test("POST /orders stores a valid order with price and confirmation code", async
   expect(res.status).toBe(201);
   const order = await j(res);
   expect(order.price).toBe(40);
-  expect(order.code).toMatch(/^[A-Z0-9]{6}$/);
+  expect(order.confirmationCode).toMatch(/^[A-Z0-9]{6}$/);
 
   const fetched = await j(fetch(`${url}/orders/${order.id}`));
   expect(fetched).toEqual(order);

@@ -3,16 +3,17 @@ import type { OrderInput } from "./rules";
 
 export interface Order extends OrderInput {
   id: string;
-  code: string;
+  confirmationCode: string;
   price: number;
   createdAt: string;
 }
 
 export function openDb(path: string) {
   const db = new Database(path, { create: true, strict: true });
+  // orders(id, confirmationCode, customerName, phone, pickupDate, item, price, createdAt)
   db.run(`CREATE TABLE IF NOT EXISTS orders (
     id TEXT PRIMARY KEY,
-    code TEXT NOT NULL,
+    confirmationCode TEXT NOT NULL,
     customerName TEXT NOT NULL,
     phone TEXT NOT NULL,
     pickupDate TEXT NOT NULL,
@@ -22,7 +23,7 @@ export function openDb(path: string) {
   )`);
 
   const insert = db.query(
-    `INSERT INTO orders VALUES ($id, $code, $customerName, $phone, $pickupDate, $item, $price, $createdAt)`,
+    `INSERT INTO orders VALUES ($id, $confirmationCode, $customerName, $phone, $pickupDate, $item, $price, $createdAt)`,
   );
   const byId = db.query<Row, { id: string }>(`SELECT * FROM orders WHERE id = $id`);
   const all = db.query<Row, []>(`SELECT * FROM orders ORDER BY createdAt`);

@@ -14,7 +14,7 @@ const json = (body: unknown, status = 200) => Response.json(body, { status });
 
 // Excludes look-alike characters so the code is unambiguous when read aloud.
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-const confirmationCode = () =>
+const newConfirmationCode = () =>
   Array.from({ length: 6 }, () => CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)]).join("");
 
 export function createServer({ db, port, today }: Options) {
@@ -35,7 +35,7 @@ export function createServer({ db, port, today }: Options) {
           if (!result.ok) return json({ error: result.error }, 400);
           const order = {
             id: crypto.randomUUID(),
-            code: confirmationCode(),
+            confirmationCode: newConfirmationCode(),
             customerName: input.customerName,
             phone: input.phone,
             pickupDate: input.pickupDate,
