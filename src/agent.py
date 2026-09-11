@@ -20,54 +20,72 @@ logger = logging.getLogger("bakery-agent")
 
 load_dotenv(".env.local")
 
-VOICE_INSTRUCTIONS = textwrap.dedent(
+MENU = textwrap.dedent(
     """\
-    You answer the phone for Jason's Bakery, which makes made-to-order cakes,
-    cupcakes, and bread. You are warm, brief, and speak in plain conversational
-    sentences with no lists, markdown, or special characters. Ask one question at
-    a time. Spell out numbers and read confirmation codes one character at a time.
+    Jason's Bakery makes made-to-order cakes, cupcakes, and bread, one item per
+    order. Cakes come in 4 inch serving 8 for 20 dollars, 6 inch serving 12 for
+    30 dollars, and 7 inch serving 18 for 40 dollars, with a design phrase the
+    bakery does its best to match. Cupcakes are 2 dollars each, 10 to 40 per
+    order, with a design phrase. Bread is banana, blueberry, or strawberry at 10
+    dollars a loaf. Cakes and cupcakes need a pickup date at least a week out.
+    Bread is picked up on Friday and must be ordered by Thursday that week.
     """
 )
 
 
-def ordering_instructions(today: date) -> str:
+def voice_instructions(today: date) -> str:
     return textwrap.dedent(
-        f"""\
-        Today is {today.strftime("%A, %B %d, %Y")} ({today.isoformat()}).
+        """\
+        You answer the phone for Jason's Bakery. Today is {today:%A, %B %d, %Y}.
+        You are warm and brief, speaking in plain conversational sentences with
+        no lists or special characters, and you ask one question at a time.
 
-        Take one order per call: a single cake, a single batch of cupcakes, or a
-        single loaf of bread. Use get_menu if the caller asks what is available or
-        how much things cost. Collect everything the order needs, including the
-        caller's name and phone number, then read the whole order back and get a
-        clear yes before calling an order tool. Never invent sizes, bread types, or
-        prices that are not on the menu.
-
-        Pickup dates go to the tools as YYYY-MM-DD. Cakes and cupcakes need a
-        pickup date at least a week from today. Bread is picked up on Friday and
-        must be ordered by Thursday of the same week. If a tool says the order was
-        not placed, tell the caller the reason in your own words and offer the
-        nearest date or amount that works.
-
-        After a successful order, tell the caller the total and read the
-        confirmation code back one character at a time.
+        {menu}
+        Answer greetings and questions about the menu yourself, from the facts
+        above only. Collect the item details, a pickup date, the caller's name,
+        and phone number, then read the whole order back and get a clear yes.
+        After the yes, delegate placing the order, and say you are putting it in
+        while you wait. Also delegate any pickup date the caller proposes so it
+        can be checked against the rules. Never announce an order as placed and
+        never say a confirmation code unless delegated work gave you one; read
+        the code back one character at a time.
         """
-    )
+    ).format(today=today, menu=MENU)
+
+
+def backend_instructions(today: date) -> str:
+    return textwrap.dedent(
+        """\
+        You handle work delegated by the voice model for Jason's Bakery. Today is
+        {today:%Y-%m-%d}, a {today:%A}.
+
+        {menu}
+        Resolve pickup dates the caller described into YYYY-MM-DD from today's
+        date. To place an order, call order_cake, order_cupcakes, or order_bread
+        with the details from the conversation. If the tool says the order was
+        not placed, reply with the reason and the nearest date or amount that
+        works. If it was placed, reply with the total and the confirmation code
+        exactly as returned, so the voice model can read it out.
+        """
+    ).format(today=today, menu=MENU)
 
 
 class BakeryAgent(Agent):
-    def __init__(self, api: BakeryApi) -> None:
-        super().__init__(instructions=VOICE_INSTRUCTIONS)
+    def __init__(self, api: BakeryApi, today: date) -> None:
+        super().__init__(
+            instructions=voice_instructions(today),
+            llm=GPTLiveModel(
+                voice="marin",
+                # GPT-Live only listens and speaks; this backend model reasons and runs the tools
+                responses_options={"instructions": backend_instructions(today)},
+            ),
+        )
         self._api = api
 
     async def on_enter(self) -> None:
         self.session.generate_reply(
             instructions="Greet the caller, say this is Jason's Bakery, and ask what they would like to order."
         )
-
-    @function_tool
-    async def get_menu(self, context: RunContext) -> str:
-        """Get everything the bakery sells, with sizes, prices, and ordering rules."""
-        return await self._api.menu()
 
     @function_tool
     async def order_cake(
@@ -153,15 +171,8 @@ server = AgentServer()
 async def entrypoint(ctx: JobContext) -> None:
     ctx.log_context_fields = {"room": ctx.room.name}
 
-    session = AgentSession(
-        llm=GPTLiveModel(
-            voice="marin",
-            # GPT-Live only listens and speaks; this backend model reasons and runs the tools
-            responses_options={"instructions": ordering_instructions(date.today())},
-        ),
-    )
-
-    await session.start(agent=BakeryAgent(BakeryApi()), room=ctx.room)
+    session = AgentSession()
+    await session.start(agent=BakeryAgent(BakeryApi(), date.today()), room=ctx.room)
 
 
 if __name__ == "__main__":
