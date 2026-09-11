@@ -1,12 +1,12 @@
 import { Database } from "bun:sqlite";
-import type { OrderInput } from "./rules";
+import type { OrderRequest } from "./rules";
 
-export interface Order extends OrderInput {
+export type Order = OrderRequest & {
   id: string;
   confirmationCode: string;
   price: number;
   createdAt: string;
-}
+};
 
 export function openDb(path: string) {
   const db = new Database(path, { create: true, strict: true });

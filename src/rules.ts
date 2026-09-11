@@ -5,7 +5,7 @@ export type Item =
   | { type: "cupcakes"; count: number; design: string }
   | { type: "bread"; bread: Bread };
 
-export interface OrderInput {
+export interface OrderRequest {
   customerName: string;
   phone: string;
   /** YYYY-MM-DD */
@@ -27,7 +27,7 @@ function fail(error: string): Validation {
   return { ok: false, error };
 }
 
-export function validateOrder(input: OrderInput, today: string): Validation {
+export function validateOrder(input: OrderRequest, today: string): Validation {
   if (!input.customerName?.trim()) return fail("Customer name is required");
   if (!input.phone?.trim()) return fail("Phone number is required");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.pickupDate ?? "") || Number.isNaN(Date.parse(input.pickupDate))) {

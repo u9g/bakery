@@ -1,7 +1,7 @@
 import type { Db } from "./db";
 import { openDb } from "./db";
 import { MENU } from "./menu";
-import { validateOrder, type OrderInput } from "./rules";
+import { validateOrder, type OrderRequest } from "./rules";
 
 interface Options {
   db: Db;
@@ -25,9 +25,9 @@ export function createServer({ db, port, today }: Options) {
       "/orders": {
         GET: () => json(db.list()),
         POST: async (req) => {
-          let input: OrderInput;
+          let input: OrderRequest;
           try {
-            input = (await req.json()) as OrderInput;
+            input = (await req.json()) as OrderRequest;
           } catch {
             return json({ error: "Body must be JSON" }, 400);
           }
