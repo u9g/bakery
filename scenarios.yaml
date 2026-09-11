@@ -17,7 +17,7 @@ scenarios:
       4. Give your name and phone number when asked.
       5. Confirm the order when it is read back to you. Repeat the confirmation code back and end the call.
     agent_expectations: >
-      Recommends the 6 inch cake for a dozen people and quotes thirty dollars. Collects size, design, pickup date, name, and phone before placing the order. Reads the order back and waits for a yes before calling the order tool. After placing it, states the total and reads a six character confirmation code one character at a time. Never invents prices or sizes.
+      Recommends the 6 inch cake for a dozen people and quotes thirty dollars. Collects size, design, pickup date, name, and phone before placing the order. Reads the order back and waits for a yes before calling the order tool. After placing it, states the total and reads back a six character confirmation code. Never invents prices or sizes.
 
     tags:
       feature: cake
