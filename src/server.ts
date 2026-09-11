@@ -62,7 +62,8 @@ if (import.meta.main) {
   const server = createServer({
     db: openDb(process.env.DB_PATH ?? "bakery.sqlite"),
     port: Number(process.env.PORT ?? 3000),
-    today: () => new Date().toISOString().slice(0, 10),
+    // BAKERY_TODAY pins the clock so simulations are reproducible regardless of the run date.
+    today: () => process.env.BAKERY_TODAY ?? new Date().toISOString().slice(0, 10),
   });
   console.log(`bakery-api listening on ${server.url}`);
 }
