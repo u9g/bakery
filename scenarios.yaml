@@ -1,0 +1,58 @@
+# Simulated callers for the bakery agent. Run with `lk agent simulate --scenarios
+# scenarios.yaml` while the Bun API from ../api is up on localhost:3000. Pickup dates
+# are relative to the day the simulation runs because the API validates against its
+# own clock.
+name: Jason's Bakery phone orders
+scenarios:
+  - label: Orders a cake for a birthday
+    instructions: |
+      PERSONA: Ada Lovelace, calling to order a birthday cake for her son. Phone number 555 010 0100.
+      OPENING LINE: "Hi, I'd like to order a cake."
+      DO, IN ORDER:
+      1. When asked about size, say it is for about a dozen people and take whatever size the bakery suggests.
+      2. When asked about the design, say "a green dinosaur".
+      3. When asked about pickup, say two weeks from today, on a weekday.
+      4. Give your name and phone number when asked.
+      5. Confirm the order when it is read back to you. Repeat the confirmation code back and end the call.
+    agent_expectations: >
+      Recommends the 6 inch cake for a dozen people and quotes thirty dollars.
+      Collects size, design, pickup date, name, and phone before placing the
+      order. Reads the order back and waits for a yes before calling the order
+      tool. After placing it, states the total and reads a six character
+      confirmation code one character at a time. Never invents prices or sizes.
+    tags:
+      feature: cake
+
+  - label: Bread order on the wrong day gets corrected
+    instructions: |
+      PERSONA: Sam Park, wants a loaf of banana bread. Phone 555 010 0200.
+      OPENING LINE: "Can I get a loaf of banana bread for this Saturday?"
+      DO, IN ORDER:
+      1. When told bread is picked up on Fridays, agree to Friday pickup.
+      2. Give your name and phone number when asked.
+      3. Confirm the order when it is read back. End the call after hearing the confirmation code.
+    agent_expectations: >
+      Explains that bread is picked up on Fridays and must be ordered by
+      Thursday, and offers the Friday pickup instead. Quotes ten dollars. Places
+      the order only after the caller confirms, then reads back the confirmation
+      code. If today is a Friday, the agent explains the week's window has
+      closed and offers next week instead of placing the order.
+    tags:
+      feature: bread
+
+  - label: Too many cupcakes gets talked down to the maximum
+    instructions: |
+      PERSONA: Priya Nair, ordering cupcakes for an office party. Phone 555 010 0300.
+      OPENING LINE: "I need fifty cupcakes with little rainbows on them."
+      DO, IN ORDER:
+      1. When told the maximum, accept forty cupcakes.
+      2. When asked about pickup, say ten days from today.
+      3. Give your name and phone number when asked.
+      4. Confirm the order when read back and end the call after the confirmation code.
+    agent_expectations: >
+      Tells the caller the bakery makes at most forty cupcakes per order and
+      offers forty. Quotes eighty dollars for forty cupcakes at two dollars each.
+      Collects the design, pickup date, name, and phone, confirms, places the
+      order, and reads back the confirmation code.
+    tags:
+      feature: cupcakes
