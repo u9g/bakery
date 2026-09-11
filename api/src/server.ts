@@ -17,10 +17,34 @@ const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const newConfirmationCode = () =>
   Array.from({ length: 6 }, () => CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)]).join("");
 
+// any: routes keep their own path-typed params; the wrapper only reads method and url
+type Handler = (req: Bun.BunRequest<any>) => Response | Promise<Response>;
+
+// Every route logs one line: method, path, status, duration, and the reason for a rejection.
+function logged(handler: Handler): Handler {
+  return async (req) => {
+    const started = performance.now();
+    const res = await handler(req);
+    const ms = Math.round(performance.now() - started);
+    const reason = res.status >= 400 ? ((await res.clone().json()) as { error?: string }).error : undefined;
+    console.log(`${req.method} ${new URL(req.url).pathname} ${res.status} ${ms}ms${reason ? ` ${reason}` : ""}`);
+    return res;
+  };
+}
+
+function withLogging<T extends Record<string, Record<string, Handler>>>(routes: T): T {
+  return Object.fromEntries(
+    Object.entries(routes).map(([path, methods]) => [
+      path,
+      Object.fromEntries(Object.entries(methods).map(([method, h]) => [method, logged(h)])),
+    ]),
+  ) as T;
+}
+
 export function createServer({ db, port, today }: Options) {
   return Bun.serve({
     port,
-    routes: {
+    routes: withLogging({
       "/menu": { GET: () => json(MENU) },
       "/orders": {
         GET: () => json(db.list()),
@@ -48,12 +72,12 @@ export function createServer({ db, port, today }: Options) {
         },
       },
       "/orders/:id": {
-        GET: (req) => {
+        GET: (req: Bun.BunRequest<"/orders/:id">) => {
           const order = db.get(req.params.id);
           return order ? json(order) : json({ error: "Order not found" }, 404);
         },
       },
-    },
+    }),
     fetch: () => json({ error: "Not found" }, 404),
   });
 }

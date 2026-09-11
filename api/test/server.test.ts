@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, expect, test } from "bun:test";
+import { afterAll, beforeAll, expect, spyOn, test } from "bun:test";
 import { openDb } from "../src/db";
 import { createServer } from "../src/server";
 
@@ -52,4 +52,17 @@ test("GET /orders lists stored orders", async () => {
 
 test("GET /orders/:id returns 404 for unknown id", async () => {
   expect((await fetch(`${url}/orders/nope`)).status).toBe(404);
+});
+
+test("every request logs method, path, status and the reason for a rejection", async () => {
+  const log = spyOn(console, "log").mockImplementation(() => {});
+  try {
+    await fetch(`${url}/menu`);
+    await post({ customerName: "Ada", phone: "555-0100", pickupDate: "2026-09-12", item: { type: "cake", size: 7, design: "x" } });
+    const lines = log.mock.calls.map((c) => c.join(" "));
+    expect(lines.some((l) => /^GET \/menu 200 \d+ms$/.test(l))).toBe(true);
+    expect(lines.some((l) => /^POST \/orders 400 \d+ms Cakes must be ordered at least a week ahead$/.test(l))).toBe(true);
+  } finally {
+    log.mockRestore();
+  }
 });
