@@ -1,4 +1,5 @@
 import logging
+import os
 import textwrap
 from datetime import date
 
@@ -172,7 +173,14 @@ async def entrypoint(ctx: JobContext) -> None:
     ctx.log_context_fields = {"room": ctx.room.name}
 
     session = AgentSession()
-    await session.start(agent=BakeryAgent(BakeryApi(), date.today()), room=ctx.room)
+    # BAKERY_TODAY pins the clock so simulations are reproducible regardless of the run date;
+    # the API honors the same variable so both sides agree on which pickup dates are valid.
+    today = (
+        date.fromisoformat(os.environ["BAKERY_TODAY"])
+        if "BAKERY_TODAY" in os.environ
+        else date.today()
+    )
+    await session.start(agent=BakeryAgent(BakeryApi(), today), room=ctx.room)
 
 
 if __name__ == "__main__":
