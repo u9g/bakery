@@ -13,6 +13,7 @@ from livekit.agents import (
     cli,
     function_tool,
 )
+from livekit.agents.beta.tools import EndCallTool
 from livekit.plugins.openai.realtime import GPTLiveModel
 
 from bakery_api import BakeryApi
@@ -49,7 +50,8 @@ def voice_instructions(today: date) -> str:
         while you wait. Also delegate any pickup date the caller proposes so it
         can be checked against the rules. Never announce an order as placed and
         never say a confirmation code unless delegated work gave you one; read
-        the code back one character at a time.
+        the code back one character at a time. When the caller says they are done
+        or says goodbye, say goodbye and delegate ending the call.
         """
     ).format(today=today, menu=MENU)
 
@@ -66,7 +68,8 @@ def backend_instructions(today: date) -> str:
         with the details from the conversation. If the tool says the order was
         not placed, reply with the reason and the nearest date or amount that
         works. If it was placed, reply with the total and the confirmation code
-        exactly as returned, so the voice model can read it out.
+        exactly as returned, so the voice model can read it out. When the caller
+        is done or says goodbye, call end_call.
         """
     ).format(today=today, menu=MENU)
 
@@ -75,6 +78,12 @@ class BakeryAgent(Agent):
     def __init__(self, api: BakeryApi, today: date) -> None:
         super().__init__(
             instructions=voice_instructions(today),
+            # ignore_on_enter keeps the greeting from ending the call
+            tools=EndCallTool(
+                extra_description="Only after the caller has said they are done or said goodbye.",
+                end_instructions="Say a short goodbye and thank the caller.",
+                ignore_on_enter=True,
+            ).tools,
             llm=GPTLiveModel(
                 voice="marin",
                 # GPT-Live only listens and speaks; this backend model reasons and runs the tools

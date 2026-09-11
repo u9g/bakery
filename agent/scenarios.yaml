@@ -15,9 +15,11 @@ scenarios:
       2. When asked about the design, say "a green dinosaur".
       3. When asked about pickup, say Thursday, September 24th.
       4. Give your name and phone number when asked.
-      5. Confirm the order when it is read back to you. Repeat the confirmation code back and end the call.
+      5. Confirm the order when it is read back to you. Repeat the confirmation code back, say goodbye, and wait for the agent to hang up.
     agent_expectations: >
-      Recommends the 6 inch cake for a dozen people and quotes thirty dollars. Collects size, design, pickup date, name, and phone before placing the order. Reads the order back and waits for a yes before calling the order tool. After placing it, states the total and reads back a six character confirmation code. Never invents prices or sizes.
+      Recommends the 6 inch cake for a dozen people and quotes thirty dollars. Collects size, design, pickup date, name, and phone before placing the order. Reads the order back and waits for a yes before calling the order tool. After placing it, states the total and reads back a six character confirmation code. After the caller says goodbye, says goodbye and
+      ends the call itself rather than waiting for the caller to hang up. Never
+      invents prices or sizes.
 
     tags:
       feature: cake
