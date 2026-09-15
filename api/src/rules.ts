@@ -1,4 +1,4 @@
-import { BREADS, BREAD_PRICE, CAKES, CUPCAKES, type Bread, type CakeSize } from "./menu";
+import { BREADS, BREAD_PRICE, CAKES, CUPCAKES, type Bread, type CakeSize } from "./menu.ts";
 
 export type Item =
   | { type: "cake"; size: CakeSize; design: string }
