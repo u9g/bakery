@@ -1,5 +1,5 @@
-import { describe, expect, test } from "bun:test";
-import { validateOrder } from "../src/rules";
+import { describe, expect, test } from "vitest";
+import { validateOrder } from "../src/rules.ts";
 
 // 2026-09-10 is a Thursday.
 const TODAY = "2026-09-10";
