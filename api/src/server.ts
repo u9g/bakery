@@ -1,7 +1,8 @@
-import type { Db } from "./db";
-import { openDb } from "./db";
-import { MENU } from "./menu";
-import { validateOrder, type OrderRequest } from "./rules";
+import http from "node:http";
+import type { Db } from "./db.ts";
+import { openDb } from "./db.ts";
+import { MENU } from "./menu.ts";
+import { validateOrder, type OrderRequest } from "./rules.ts";
 
 interface Options {
   db: Db;
@@ -17,14 +18,13 @@ const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const newConfirmationCode = () =>
   Array.from({ length: 6 }, () => CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)]).join("");
 
-// any: routes keep their own path-typed params; the wrapper only reads method and url
-type Handler = (req: Bun.BunRequest<any>) => Response | Promise<Response>;
+type Handler = (req: Request, params: Record<string, string>) => Response | Promise<Response>;
 
 // Every route logs one line: method, path, status, duration, and the reason for a rejection.
 function logged(handler: Handler): Handler {
-  return async (req) => {
+  return async (req, params) => {
     const started = performance.now();
-    const res = await handler(req);
+    const res = await handler(req, params);
     const ms = Math.round(performance.now() - started);
     const reason = res.status >= 400 ? ((await res.clone().json()) as { error?: string }).error : undefined;
     console.log(`${req.method} ${new URL(req.url).pathname} ${res.status} ${ms}ms${reason ? ` ${reason}` : ""}`);
@@ -32,19 +32,37 @@ function logged(handler: Handler): Handler {
   };
 }
 
-function withLogging<T extends Record<string, Record<string, Handler>>>(routes: T): T {
-  return Object.fromEntries(
-    Object.entries(routes).map(([path, methods]) => [
-      path,
-      Object.fromEntries(Object.entries(methods).map(([method, h]) => [method, logged(h)])),
-    ]),
-  ) as T;
+type Routes = Record<string, Record<string, Handler>>;
+
+// "/orders/:id" matches one path segment per ":name" and exposes it in params.
+function matchRoute(routes: Routes, pathname: string): [Record<string, Handler>, Record<string, string>] | undefined {
+  for (const [pattern, methods] of Object.entries(routes)) {
+    const names: string[] = [];
+    const re = new RegExp(`^${pattern.replace(/:(\w+)/g, (_, n) => (names.push(n), "([^/]+)"))}$`);
+    const m = pathname.match(re);
+    if (m) return [methods, Object.fromEntries(names.map((n, i) => [n, decodeURIComponent(m[i + 1]!)]))];
+  }
+  return undefined;
+}
+
+async function toRequest(req: http.IncomingMessage): Promise<Request> {
+  const chunks: Buffer[] = [];
+  for await (const c of req) chunks.push(c as Buffer);
+  const body = chunks.length ? Buffer.concat(chunks) : undefined;
+  return new Request(`http://${req.headers.host ?? "localhost"}${req.url ?? "/"}`, {
+    method: req.method,
+    headers: req.headers as Record<string, string>,
+    body,
+  });
+}
+
+async function send(res: http.ServerResponse, out: Response) {
+  res.writeHead(out.status, Object.fromEntries(out.headers));
+  res.end(Buffer.from(await out.arrayBuffer()));
 }
 
 export function createServer({ db, port, today }: Options) {
-  return Bun.serve({
-    port,
-    routes: withLogging({
+  const routes: Routes = {
       "/menu": { GET: () => json(MENU) },
       "/orders": {
         GET: () => json(db.list()),
@@ -72,18 +90,31 @@ export function createServer({ db, port, today }: Options) {
         },
       },
       "/orders/:id": {
-        GET: (req: Bun.BunRequest<"/orders/:id">) => {
-          const order = db.get(req.params.id);
+        GET: (_req, params) => {
+          const order = db.get(params.id!);
           return order ? json(order) : json({ error: "Order not found" }, 404);
         },
       },
-    }),
-    fetch: () => json({ error: "Not found" }, 404),
+  };
+
+  const server = http.createServer(async (req, res) => {
+    const request = await toRequest(req);
+    const matched = matchRoute(routes, new URL(request.url).pathname);
+    const handler = matched?.[0][request.method];
+    const out = handler ? await logged(handler)(request, matched![1]) : json({ error: "Not found" }, 404);
+    await send(res, out);
+  });
+
+  return new Promise<{ port: number; url: string; stop: () => void }>((resolve) => {
+    server.listen(port, () => {
+      const addr = server.address() as { port: number };
+      resolve({ port: addr.port, url: `http://localhost:${addr.port}`, stop: () => server.close() });
+    });
   });
 }
 
 if (import.meta.main) {
-  const server = createServer({
+  const server = await createServer({
     db: openDb(process.env.DB_PATH ?? "bakery.sqlite"),
     port: Number(process.env.PORT ?? 3099),
     // BAKERY_TODAY pins the clock so simulations are reproducible regardless of the run date.

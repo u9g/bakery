@@ -1,5 +1,5 @@
-import { Database } from "bun:sqlite";
-import type { OrderRequest } from "./rules";
+import { DatabaseSync } from "node:sqlite";
+import type { OrderRequest } from "./rules.ts";
 
 export type Order = OrderRequest & {
   id: string;
@@ -9,9 +9,9 @@ export type Order = OrderRequest & {
 };
 
 export function openDb(path: string) {
-  const db = new Database(path, { create: true, strict: true });
+  const db = new DatabaseSync(path);
   // orders(id, confirmationCode, customerName, phone, pickupDate, item, price, createdAt)
-  db.run(`CREATE TABLE IF NOT EXISTS orders (
+  db.exec(`CREATE TABLE IF NOT EXISTS orders (
     id TEXT PRIMARY KEY,
     confirmationCode TEXT NOT NULL,
     customerName TEXT NOT NULL,
@@ -22,26 +22,29 @@ export function openDb(path: string) {
     createdAt TEXT NOT NULL
   )`);
 
-  const insert = db.query(
+  const insert = db.prepare(
     `INSERT INTO orders VALUES ($id, $confirmationCode, $customerName, $phone, $pickupDate, $item, $price, $createdAt)`,
   );
-  const byId = db.query<Row, { id: string }>(`SELECT * FROM orders WHERE id = $id`);
-  const all = db.query<Row, []>(`SELECT * FROM orders ORDER BY createdAt`);
+  const selectById = db.prepare(`SELECT * FROM orders WHERE id = $id`);
+  const selectAll = db.prepare(`SELECT * FROM orders ORDER BY createdAt`);
 
   return {
     insert(order: Order) {
       insert.run({ ...order, item: JSON.stringify(order.item) });
     },
     get(id: string): Order | undefined {
-      const row = byId.get({ id });
-      return row ? fromRow(row) : undefined;
+      const row = selectById.get({ id });
+      return row ? deserializeOrderDetails(row) : undefined;
     },
     list(): Order[] {
-      return all.all().map(fromRow);
+      return selectAll.all().map(deserializeOrderDetails);
     },
   };
 }
 export type Db = ReturnType<typeof openDb>;
 
 type Row = Omit<Order, "item"> & { item: string };
-const fromRow = (r: Row): Order => ({ ...r, item: JSON.parse(r.item) });
+const deserializeOrderDetails = (r: object): Order => {
+  const row = r as Row;
+  return { ...row, item: JSON.parse(row.item) };
+};

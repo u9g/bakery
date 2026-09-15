@@ -3,9 +3,9 @@
 HTTP backend for the Jason's Bakery phone-ordering voice agent.
 
 ```sh
-bun install
-bun run dev      # http://localhost:3099
-bun test
+npm install
+npm run dev      # http://localhost:3099
+npm test
 ```
 
 Set `BAKERY_TODAY=YYYY-MM-DD` to pin the date the pickup rules are checked against.
