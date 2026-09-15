@@ -1,12 +1,12 @@
-import { afterAll, beforeAll, expect, spyOn, test } from "bun:test";
-import { openDb } from "../src/db";
-import { createServer } from "../src/server";
+import { afterAll, beforeAll, expect, test, vi } from "vitest";
+import { openDb } from "../src/db.ts";
+import { createServer } from "../src/server.ts";
 
 let url: string;
-let server: ReturnType<typeof createServer>;
+let server: Awaited<ReturnType<typeof createServer>>;
 
-beforeAll(() => {
-  server = createServer({ db: openDb(":memory:"), port: 0, today: () => "2026-09-10" });
+beforeAll(async () => {
+  server = await createServer({ db: openDb(":memory:"), port: 0, today: () => "2026-09-10" });
   url = `http://localhost:${server.port}`;
 });
 afterAll(() => server.stop());
@@ -55,7 +55,7 @@ test("GET /orders/:id returns 404 for unknown id", async () => {
 });
 
 test("every request logs method, path, status and the reason for a rejection", async () => {
-  const log = spyOn(console, "log").mockImplementation(() => {});
+  const log = vi.spyOn(console, "log").mockImplementation(() => {});
   try {
     await fetch(`${url}/menu`);
     await post({ customerName: "Ada", phone: "555-0100", pickupDate: "2026-09-12", item: { type: "cake", size: 7, design: "x" } });
