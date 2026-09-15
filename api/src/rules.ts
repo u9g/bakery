@@ -1,17 +1,37 @@
-import { BREADS, BREAD_PRICE, CAKES, CUPCAKES, type Bread, type CakeSize } from "./menu.ts";
+import { z } from "zod";
+import { BREADS, BREAD_PRICE, CAKE_SIZES, CAKES, CUPCAKES } from "./menu.ts";
 
-export type Item =
-  | { type: "cake"; size: CakeSize; design: string }
-  | { type: "cupcakes"; count: number; design: string }
-  | { type: "bread"; bread: Bread };
+const design = z.string().trim().min(1, "A design phrase is required");
 
-export interface OrderRequest {
-  customerName: string;
-  phone: string;
-  /** YYYY-MM-DD */
-  pickupDate: string;
-  item: Item;
-}
+export const OrderRequest = z.object({
+  customerName: z.string().trim().min(1, "Customer name is required"),
+  phone: z.string().trim().min(1, "Phone number is required"),
+  pickupDate: z.iso.date("Pickup date must be YYYY-MM-DD"),
+  item: z.discriminatedUnion(
+    "type",
+    [
+      z.object({
+        type: z.literal("cake"),
+        size: z.literal(CAKE_SIZES, `We only make ${CAKE_SIZES.join('", "')}" cakes`),
+        design,
+      }),
+      z.object({
+        type: z.literal("cupcakes"),
+        count: z
+          .int()
+          .min(CUPCAKES.min, `Cupcakes are ordered in batches of ${CUPCAKES.min} to ${CUPCAKES.max}`)
+          .max(CUPCAKES.max, `Cupcakes are ordered in batches of ${CUPCAKES.min} to ${CUPCAKES.max}`),
+        design,
+      }),
+      z.object({
+        type: z.literal("bread"),
+        bread: z.enum(BREADS, `Bread types are ${BREADS.join(", ")}`),
+      }),
+    ],
+    "Item type must be cake, cupcakes, or bread",
+  ),
+});
+export type OrderRequest = z.infer<typeof OrderRequest>;
 
 export type Validation = { ok: true; price: number } | { ok: false; error: string };
 
@@ -27,38 +47,23 @@ function fail(error: string): Validation {
   return { ok: false, error };
 }
 
-export function validateOrder(input: OrderRequest, today: string): Validation {
-  if (!input.customerName?.trim()) return fail("Customer name is required");
-  if (!input.phone?.trim()) return fail("Phone number is required");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.pickupDate ?? "") || Number.isNaN(Date.parse(input.pickupDate))) {
-    return fail("Pickup date must be YYYY-MM-DD");
-  }
-  const days = daysBetween(today, input.pickupDate);
-  const item = input.item;
+export function validateOrder(input: unknown, today: string): Validation {
+  const parsed = OrderRequest.safeParse(input);
+  if (!parsed.success) return fail(parsed.error.issues[0]!.message);
+  const { item, pickupDate } = parsed.data;
+  const days = daysBetween(today, pickupDate);
 
-  switch (item?.type) {
-    case "cake": {
-      if (!(item.size in CAKES)) return fail(`We only make ${Object.keys(CAKES).join('", "')}" cakes`);
-      if (!item.design?.trim()) return fail("A design phrase is required");
+  switch (item.type) {
+    case "cake":
       if (days < 7) return fail("Cakes must be ordered at least a week ahead");
       return { ok: true, price: CAKES[item.size].price };
-    }
-    case "cupcakes": {
-      if (!Number.isInteger(item.count) || item.count < CUPCAKES.min || item.count > CUPCAKES.max) {
-        return fail(`Cupcakes are ordered in batches of ${CUPCAKES.min} to ${CUPCAKES.max}`);
-      }
-      if (!item.design?.trim()) return fail("A design phrase is required");
+    case "cupcakes":
       if (days < 7) return fail("Cupcakes must be ordered at least a week ahead");
       return { ok: true, price: item.count * CUPCAKES.pricePer };
-    }
-    case "bread": {
-      if (!BREADS.includes(item.bread)) return fail(`Bread types are ${BREADS.join(", ")}`);
+    case "bread":
       // Pickup is the coming Friday; orders open Saturday and close Thursday (1..6 days ahead).
-      if (new Date(input.pickupDate).getUTCDay() !== FRIDAY) return fail("Bread is picked up on Fridays");
+      if (new Date(pickupDate).getUTCDay() !== FRIDAY) return fail("Bread is picked up on Fridays");
       if (days < 1 || days > 6) return fail("Bread must be ordered by Thursday for that Friday");
       return { ok: true, price: BREAD_PRICE };
-    }
-    default:
-      return fail("Item type must be cake, cupcakes, or bread");
   }
 }
