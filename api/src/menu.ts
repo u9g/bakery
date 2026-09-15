@@ -1,9 +1,10 @@
-export const CAKES = {
+export const CAKE_SIZES = [4, 6, 7] as const;
+export type CakeSize = (typeof CAKE_SIZES)[number];
+export const CAKES: Record<CakeSize, { serves: number; price: number }> = {
   4: { serves: 8, price: 20 },
   6: { serves: 12, price: 30 },
   7: { serves: 18, price: 40 },
-} as const;
-export type CakeSize = keyof typeof CAKES;
+};
 
 export const CUPCAKES = { min: 10, max: 40, pricePer: 2 } as const;
 
